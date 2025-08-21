@@ -1,0 +1,7 @@
+people lose flights due to unexpected traffic. i want to make a program that prevents this. I
+ am thinking of it to play a sound when to wake me up. to know when to play the sound the use
+ rs enters all the inofrmation of the destination on google maps. then on the program the use
+ rs enters when the users wants to arrive at the destination and how much earlier then the de
+ parture time it wants to wake up. then the program reloads the link on google, checks how mu
+ ch time it take to get to the destination, adds the time to the current time plus the time t
+ o wake up and sees if that is the time to arrive to the destination. 
