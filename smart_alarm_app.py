@@ -14,18 +14,18 @@ class SmartAlarmApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Smart Alarm")
-        self.geometry("860x640")
+        self.geometry("860x750")
 
         # State
-        self.state_var = tk.StringVar(value="Idle")  # Idle | Running | Paused | Ringing
+        self.state_var = tk.StringVar(value="Idle")  # Idle | Running | Ringing
         self.button_var = tk.StringVar(value="Run Program")
         self.google_api_key_var = tk.StringVar(value=os.getenv("GOOGLE_MAPS_API_KEY") or "")
         self.origin_var = tk.StringVar(value="Syntagma Square, Athens")
         self.destination_var = tk.StringVar(value="Athens International Airport")
-        self.arrival_iso_var = tk.StringVar(value="2025-08-09T15:30:00+03:00")
+        self.arrival_iso_var = tk.StringVar(value="2025-10-09T15:30:00+03:00")
         self.prep_min_var = tk.StringVar(value="15")
         self.buffer_min_var = tk.StringVar(value="60")
-        self.sound_path_var = tk.StringVar(value="")
+        self.sound_path_var = tk.StringVar(value="wakey-wakey-eggs.mp3")
         self.coarse_poll_s_var = tk.StringVar(value="180")
         self.fine_poll_s_var = tk.StringVar(value="60")
         self.fine_window_min_var = tk.StringVar(value="30")
@@ -33,7 +33,6 @@ class SmartAlarmApp(tk.Tk):
         # Threading primitives
         self._worker_thread: threading.Thread | None = None
         self._stop_program_event = threading.Event()
-        self._pause_program_event = threading.Event()
         self._stop_alarm_event = threading.Event()
         self._log_queue: queue.Queue[str] = queue.Queue()
         self._current_alarm_proc: subprocess.Popen | None = None
@@ -94,6 +93,9 @@ class SmartAlarmApp(tk.Tk):
         self.primary_btn = ttk.Button(bottom, textvariable=self.button_var, command=self._on_primary_button)
         self.primary_btn.pack(side=tk.RIGHT)
 
+        # Play startup alarm sound
+        self.after(500, self._play_startup_sound)
+
     def _browse_sound(self) -> None:
         path = filedialog.askopenfilename(title="Choose alarm sound",
                                           filetypes=(("Audio files", "*.mp3 *.wav"), ("All files", "*.*")))
@@ -124,9 +126,7 @@ class SmartAlarmApp(tk.Tk):
         if state == "Idle":
             self._start_program()
         elif state == "Running":
-            self._pause_program()
-        elif state == "Paused":
-            self._resume_program()
+            self._stop_program()
         elif state == "Ringing":
             self._stop_alarm()
 
@@ -160,24 +160,18 @@ class SmartAlarmApp(tk.Tk):
             return
 
         self._stop_program_event.clear()
-        self._pause_program_event.clear()
         self._stop_alarm_event.clear()
 
         args = (origin, destination, arrival_iso, prep_min, buffer_min, sound_path, coarse_poll_s, fine_poll_s, fine_window_min)
         self._worker_thread = threading.Thread(target=self._run_worker, args=args, daemon=True)
         self._worker_thread.start()
-        self._set_state("Running", "Pause Program")
+        self._set_state("Running", "Stop Program")
         self.log("Program started.")
 
-    def _pause_program(self) -> None:
-        self._pause_program_event.set()
-        self._set_state("Paused", "Resume Program")
-        self.log("Program paused.")
-
-    def _resume_program(self) -> None:
-        self._pause_program_event.clear()
-        self._set_state("Running", "Pause Program")
-        self.log("Program resumed.")
+    def _stop_program(self) -> None:
+        self._stop_program_event.set()
+        self._set_state("Idle", "Run Program")
+        self.log("Program stopped.")
 
     def _stop_alarm(self) -> None:
         self._stop_alarm_event.set()
@@ -210,9 +204,6 @@ class SmartAlarmApp(tk.Tk):
         next_poll_at = 0.0
         try:
             while not self._stop_program_event.is_set():
-                # Pause handling
-                while self._pause_program_event.is_set() and not self._stop_program_event.is_set():
-                    time.sleep(0.2)
 
                 now = time.time()
                 if now < next_poll_at:
@@ -293,8 +284,40 @@ class SmartAlarmApp(tk.Tk):
         # After ringing completes or is stopped
         self.after(0, lambda: self._set_state("Idle", "Run Program"))
 
+    def _play_startup_sound(self) -> None:
+        """Play the startup alarm sound when the program starts using the existing function logic."""
+        sound_path = self.sound_path_var.get().strip()
+        if sound_path:
+            try:
+                # Use the same logic as try_startup_alarm_sound but without exiting
+                startup_thread = threading.Thread(target=self._run_startup_sound_test, args=(sound_path,), daemon=True)
+                startup_thread.start()
+                self.log("Testing startup alarm sound...")
+            except Exception as exc:
+                self.log(f"Failed to start startup sound test: {exc}")
+        else:
+            self.log("No sound file configured for startup test.")
+
+    def _run_startup_sound_test(self, sound_path: str) -> None:
+        """Run the startup sound test using the existing function logic."""
+        try:
+            if not os.path.exists(sound_path):
+                self.log(f"Startup sound test failed; file not found: {sound_path}")
+                return
+            
+            self.log("Playing startup sound test for 3 seconds...")
+            # Use the same logic as try_startup_alarm_sound but without exiting
+            proc = subprocess.Popen(["afplay", "-t", "3", sound_path])
+            proc.wait()
+            self.log("Startup sound test successful!")
+        except FileNotFoundError:
+            self.log("'afplay' not found; cannot run startup sound test.")
+        except Exception as exc:
+            self.log(f"Startup sound test failed: {exc}")
+
 
 if __name__ == "__main__":
     app = SmartAlarmApp()
     app.mainloop()
 
+    

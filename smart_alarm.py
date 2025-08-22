@@ -120,27 +120,7 @@ def ring_alarm(sound_path: str | None = None) -> str:
         print("No valid sound file provided; skipping alarm sound.")
     return "Alarm attempted"
 
-def try_startup_alarm_sound(sound_path: str | None) -> None:
-    """Play a 3-second preview of the alarm sound on startup to verify audio works.
-    
-    Exits the program if the sound test fails.
-    """
-    if not sound_path:
-        print("No sound configured (SOUND is empty); exiting.")
-        sys.exit(1)
-    if not os.path.exists(sound_path):
-        print(f"Startup sound test failed; file not found: {sound_path}")
-        sys.exit(1)
-    print("Testing alarm sound for 3 seconds...")
-    try:
-        subprocess.run(["afplay", "-t", "3", sound_path], check=False)
-        print("Startup sound test successful!")
-    except FileNotFoundError:
-        print("'afplay' not found; cannot run startup sound test. Exiting.")
-        sys.exit(1)
-    except Exception as exc:
-        print(f"Startup sound test failed: {exc}. Exiting.")
-        sys.exit(1)
+
 
 # --- Orchestrator: polling loop ---
 def run_alarm(origin: str,
